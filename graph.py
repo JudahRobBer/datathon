@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
-import streamlit as st
 import networkx as nx
 from selenium import webdriver
+import undetected_chromedriver as uc
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
@@ -12,6 +12,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time, os
 import random as rd
+from bs4 import BeautifulSoup
+from bs4.element import Comment
+import pickle
 
 
 """
@@ -42,16 +45,13 @@ def load_data(filename:str) -> pd.DataFrame:
 
 
 def sleep():
-    time.sleep(rd.randrange(1,4))
+    time.sleep(rd.randrange(1,2))
 
 
-def login_twitter(bot:webdriver.Chrome):
+def login_twitter(bot:webdriver.Chrome, email:str, username:str, password:str):
     """
     Login to twitter using selenium
     """
-    email = "jrobbinsbernal@colgate.edu"
-    password = "Jewdah17!"
-    username = "judahlovesdata"
 
     bot.get('https://twitter.com/i/flow/login')
     # adjust the sleep time according to your internet speed
@@ -89,69 +89,131 @@ def login_twitter(bot:webdriver.Chrome):
         sleep()
 
 
-def navigate_search(bot:webdriver.Chrome,twitter_handle:str):
-    sleep()
-    bot.get("https://twitter.com/explore")
-    sleep()
-    search_bar =  bot.find_element(By.TAG_NAME,"input")
-    search_bar.click()
-    search_bar.send_keys(twitter_handle)
-    search_bar.send_keys(Keys.RETURN)
+def logout_twitter(bot:webdriver.Chrome):
     
+    bot.get("https://twitter.com/logout")
+    sleep()
+    logout_button = bot.find_element(By.XPATH,"//*[contains(text(),'Log out')]")
+    logout_button.click()
 
+
+def check_followers(bot:webdriver.Chrome,twitter_handle:str, usernames:list, emails:list, password:str):
+    """
+    Twitter doesn't allow us to view all of a persons followers, but if I first follow all the concerned users from my account
+    I'm able to look at all the followers of a user who I also follow
     
+    """
+    followers = []
+    #iterate over all accounts
+    for index in range(len(usernames)):
+        login_twitter(bot,emails[index],usernames[index],password)
+        sleep()
+        bot.get(f"https://twitter.com/{twitter_handle}/followers_you_follow")
+        sleep()
+        try:
+            elements = bot.find_element(By.TAG_NAME, "section").get_attribute('innerHTML')
+            soup = BeautifulSoup(elements, features="html.parser")
+       
+            data = soup.find_all("span", attrs={'class':"css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0"})
+            for element in data:
+                if element.contents[0][0] == "@":
+                    followers.append(element.contents[0][1:])
+        except:
+            pass
+        
+        sleep()
+        logout_twitter(bot)
+        sleep()    
 
-
-def get_twitter_followers(twitter_handle:str) -> list[str]: 
+    return followers
    
     
-    email = "jrobbinsbernal@colgate.edu"
-    password = "Jewdah17!"
-    username = "judahlovesdata"
+def follow_all_accounts(bot:webdriver.Chrome,graph:nx.DiGraph, usernames:list, emails:list, password:str):
+    """
+    Before I'm able to check if a user follows another user,
+    I first need to follow all the users in the dataset from controlled accounts
+    With these accounts, I can find the accounts that follow the relevant account for check_followers
     
-    options = Options()
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("window-size=1200x600")
-    # Exclude the collection of enable-automation switches 
-    options.add_experimental_option("excludeSwitches", ["enable-automation"]) 
- 
-    # Turn-off userAutomationExtension 
-    options.add_experimental_option("useAutomationExtension", False) 
+    """
+    node_list = np.array_split(np.array(graph.nodes),10)
 
+    for index,lst in enumerate(node_list):
+
+        print(f"Starting list {index}")
+        login_twitter(bot,emails[index],usernames[index],password)
+        sleep()
+        for index,node in enumerate(lst):
+            print(node, index)
+            bot.get(f"https://twitter.com/{node}")
+            time.sleep(rd.randrange(2,5))
+            try:
+                follow_button = bot.find_element(By.XPATH,"//*[@id='react-root']/div/div/div[2]/main/div/div/div/div/div/div[3]/div/div/div/div/div[1]/div[2]/div[2]/div[1]/div")
+                follow_button.click()
+            except:
+                print("follow button not found")
+            
+            time.sleep(rd.randrange(2,5))
+        print(f"list {index} complete! Taking a short break")
+        
+        #clean up cache and logout
+        logout_twitter(bot)
+        time.sleep(15)
     
-    bot = webdriver.Chrome(options=options)
-
-    login_twitter(bot)
-    navigate_search(bot,twitter_handle)
-    time.sleep(15)
-    
-    
-   
 
 
-
-def create_graph_edges(graph:nx.DiGraph) -> None:
+def create_graph_edges(graph:nx.DiGraph) -> nx.DiGraph:
     """
     Iterate over the nodes in the graph, accessing their twitter handle to extract followers
     for every follower, if they are also a node, create an edge from them to account
     """
     
-   
-    
-    #set to improve search efficiency
-    node_set = set()
-    for node in graph.nodes:
-        node_set.add(node)
-    
-    users = list(graph.nodes)
-    print(len(users))
-    
+    bot = uc.Chrome()
+
+    usernames = ["datacollec81608",
+                 "datacollec51206",
+                 "datacollec41168",
+                 "datacollec74936",
+                 "datacollec70650",
+                 "datacollec68581",
+                 "thesebitch99318",
+                 "justonemor36852",
+                 "finale699887",
+                 "wemadeit578158"
+                 ]
+    emails = ["4bbdac6558e756@theeyeoftruth.com",
+              "98915a6558e814@beaconmessenger.com",
+              "06911d6558e877@theeyeoftruth.com", 
+              "95d47b6558e8ef@beaconmessenger.com",
+              "b151326558e975@theeyeoftruth.com",
+              "0051cf6558e9dc@beaconmessenger.com",
+              "4d63eb6558ea63@theeyeoftruth.com",
+              "5f2e166558eced@beaconmessenger.com",
+              "709d276559101d@beaconmessenger.com",
+              "efd04f6558ee22@theeyeoftruth.com"]
+    password = "testing12345"
 
 
+    #this function has already been called during development. Calling it again is UB!
+    #follow_all_accounts(bot,graph,usernames,emails,password)
     
+    for node, data in graph.nodes(data=True):
+        #calculations based off the time of each check_followers crawl
+        #limiting checks to followers with 20000+ followers reduces total
+        #time to 6.5 hours
+        if data["attr"]["weight"] > 20000:
+            try:
+                followers = check_followers(bot,node,usernames,emails,password)
+                for follower in followers:
+                    graph.add_edge(follower,node)
+            except:
+                pass
+
+    return graph
 
 
-def create_graph_nodes(df:pd.DataFrame, graph:nx.DiGraph) -> None:
+
+    
+def create_graph_nodes(df:pd.DataFrame, graph:nx.DiGraph) -> nx.DiGraph:
     """
     load in the dataframe including only entries with twitter handles
     iterate over handles in the data frame, add them as nodes with relevant information
@@ -170,6 +232,7 @@ def create_graph_nodes(df:pd.DataFrame, graph:nx.DiGraph) -> None:
         
         node_dict = vars(node)
         graph.add_node(node_id,attr=node_dict)
+    return graph
    
 
 
@@ -177,8 +240,11 @@ def create_graph_nodes(df:pd.DataFrame, graph:nx.DiGraph) -> None:
 def create_graph() -> nx.DiGraph:
     df = load_data("CANIS_data.xlsx")
     graph = nx.DiGraph()
-    create_graph_nodes(df,graph)
-    #create_graph_edges(graph)
-    get_twitter_followers("_bubblyabby_")
+    graph = create_graph_nodes(df,graph)
+    graph = create_graph_edges(graph)
+    
+
+        
+    pickle.dump(graph, open('graph.p','wb'))
 
 create_graph()
