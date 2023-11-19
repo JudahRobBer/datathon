@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Comment
 import pickle
 import matplotlib.pyplot as plt
+import pygraphviz
 
 
 """
@@ -300,6 +301,7 @@ def create_graph() -> nx.DiGraph:
     #pickle.dump(graph, open('graph.p','wb'))
 
     graph = pickle.load(open("graph.p","rb"))
+    
     return graph
 
 #create_graph()
