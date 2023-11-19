@@ -8,9 +8,8 @@ import pandas as pd
 
 
 def main(): 
-    df = pd.read_excel("CANIS_DATA.xlsx")
-    df = df.dropna(subset="X (Twitter) handle")
-    print(df.loc[:,"X (Twitter) handle"])
+    st.markdown("# Main Page #")
+    st.sidebar.markdown("# Main Page #")
 
 
 main()

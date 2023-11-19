@@ -15,6 +15,7 @@ import random as rd
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 import pickle
+import matplotlib.pyplot as plt
 
 
 """
@@ -58,14 +59,19 @@ def login_twitter(bot:webdriver.Chrome, email:str, username:str, password:str):
     
     #first login page
     sleep()
-    bot.find_element(By.CSS_SELECTOR,"input[autocomplete= 'username']").click()
+    username_button = bot.find_element(By.CSS_SELECTOR,"input[autocomplete= 'username']")
     sleep()
+    username_button.click()
     
-    bot.find_element(By.CSS_SELECTOR,"input[autocomplete= 'username']").send_keys(email)
+    username_box = bot.find_element(By.CSS_SELECTOR,"input[autocomplete= 'username']")
+    sleep()
+    username_box.send_keys(email)
     sleep()
     
     #click on button by text
-    bot.find_element(By.XPATH,"//*[contains(text(),'Next')]").click()
+    next_box = bot.find_element(By.XPATH,"//*[contains(text(),'Next')]")
+    sleep()
+    next_box.click()
 
     sleep()
 
@@ -92,28 +98,52 @@ def login_twitter(bot:webdriver.Chrome, email:str, username:str, password:str):
 def logout_twitter(bot:webdriver.Chrome):
     
     bot.get("https://twitter.com/logout")
-    sleep()
+    time.sleep(7)
     logout_button = bot.find_element(By.XPATH,"//*[contains(text(),'Log out')]")
     logout_button.click()
 
 
-def check_followers(bot:webdriver.Chrome,twitter_handle:str, usernames:list, emails:list, password:str):
+def add_account_followers_to_graph(bot:webdriver.Chrome,graph:nx.DiGraph):
     """
-    Twitter doesn't allow us to view all of a persons followers, but if I first follow all the concerned users from my account
-    I'm able to look at all the followers of a user who I also follow
+    after bot is logged into a given user
+    check all the followers_you_follow page for the user account
+    for each account, add the edges to the graph
     
+    for account in acccount_handles:
+        #get webpage
+        #get followers data
+        #add edges for each follower to account
+
     """
-    followers = []
-    #iterate over all accounts
-    for index in range(len(usernames)):
-        login_twitter(bot,emails[index],usernames[index],password)
-        sleep()
-        bot.get(f"https://twitter.com/{twitter_handle}/followers_you_follow")
-        sleep()
+    def fake_movement(bot:webdriver.Chrome):
+        bot.execute_script("window.scrollTo(0, document.body.scrollHeight);","")
+        time.sleep(1)
+        bot.execute_script("window.scrollBy(0, 0);","")
+
+    print("getting followers")
+
+    handles = list(graph.copy().nodes)
+    handles = [handle for handle in handles if "attr" in graph.nodes[handle] and graph.nodes[handle]["attr"]["weight"] > 15000]
+    size = len(handles)
+
+    pause_intervals = set([size // 8,size // 6, size // 4, size // 3, size // 2, (size // 3) * 2, (size // 4) * 3, (size // 6) * 5])
+
+    for index, account_handle in enumerate(handles):
+        print(index)
+        if index in pause_intervals:
+            print("pausing to avoid suspicion!")
+            fake_movement(bot)
+            time.sleep(10)
+        
+       
+        followers = []
+        bot.get(f"https://twitter.com/{account_handle}/followers_you_follow")
+        fake_movement(bot)
+        time.sleep(rd.randrange(8,10))
         try:
             elements = bot.find_element(By.TAG_NAME, "section").get_attribute('innerHTML')
             soup = BeautifulSoup(elements, features="html.parser")
-       
+    
             data = soup.find_all("span", attrs={'class':"css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0"})
             for element in data:
                 if element.contents[0][0] == "@":
@@ -121,11 +151,10 @@ def check_followers(bot:webdriver.Chrome,twitter_handle:str, usernames:list, ema
         except:
             pass
         
-        sleep()
-        logout_twitter(bot)
-        sleep()    
+        for follower in followers:
+            graph.add_edge(follower,account_handle)
 
-    return followers
+
    
     
 def follow_all_accounts(bot:webdriver.Chrome,graph:nx.DiGraph, usernames:list, emails:list, password:str):
@@ -193,21 +222,36 @@ def create_graph_edges(graph:nx.DiGraph) -> nx.DiGraph:
     password = "testing12345"
 
 
+    user_agents = [
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/119.0.6045.169 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPad; CPU OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/119.0.6045.169 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPod; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/119.0.6045.169 Mobile/15E148 Safari/604.1",
+    ]
+
+
     #this function has already been called during development. Calling it again is UB!
     #follow_all_accounts(bot,graph,usernames,emails,password)
     
-    for node, data in graph.nodes(data=True):
-        #calculations based off the time of each check_followers crawl
-        #limiting checks to followers with 20000+ followers reduces total
-        #time to 6.5 hours
-        if data["attr"]["weight"] > 20000:
+    for i in range(len(usernames)):
+        try:
+            login_twitter(bot,emails[i],usernames[i],password)
+            sleep()
+            add_account_followers_to_graph(bot,graph)
+            sleep()
+            logout_twitter(bot)
+            print(f"finished account {i + 1}")
+        except:
+            print(f"error with account {i + 1}")
             try:
-                followers = check_followers(bot,node,usernames,emails,password)
-                for follower in followers:
-                    graph.add_edge(follower,node)
+                bot.close()
             except:
                 pass
+            bot = uc.Chrome()
 
+        
+        
     return graph
 
 
@@ -238,13 +282,24 @@ def create_graph_nodes(df:pd.DataFrame, graph:nx.DiGraph) -> nx.DiGraph:
 
 
 def create_graph() -> nx.DiGraph:
-    df = load_data("CANIS_data.xlsx")
-    graph = nx.DiGraph()
-    graph = create_graph_nodes(df,graph)
-    graph = create_graph_edges(graph)
+    """
+    All commented out behavior cover functionality that only should be run once
+    i.e: setting up follower accounts, following accounts, checking common followers
+    writing graph edges and nodes.
+
+    Now that all of this behavior is complete, this just serves to export the relevant graph
     
+    """
+    
+    #df = load_data("CANIS_data.xlsx")
+    
+    #graph = create_graph_nodes(df,graph)
+    #graph = create_graph_edges(graph)
+    
+    
+    #pickle.dump(graph, open('graph.p','wb'))
 
-        
-    pickle.dump(graph, open('graph.p','wb'))
+    graph = pickle.load(open("graph.p","rb"))
+    return graph
 
-create_graph()
+#create_graph()
