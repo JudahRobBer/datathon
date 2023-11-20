@@ -7,3 +7,4 @@ matplotlib-venn==0.11.9
 selenium==3.141.0
 beautifulsoup4==4.12.2
 google-api-python-client==2.108.0
+undetected-chromedriver==3.5.4
