@@ -1,9 +1,11 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib_venn import venn3
 from graph import create_graph
+from youtube import get_all_channels_views
 import networkx as nx
 import random as rd
 import itertools
@@ -108,16 +110,56 @@ def make_in_degree_table(graph:nx.DiGraph):
     st.dataframe(df)
 
      
+def make_facebook_follower_swarm(df:pd.DataFrame):
+    fb_frame = df.dropna(subset=["Facebook page"])
+    fb_frame = fb_frame[["Facebook Follower #", "Language"]]
+    
+    #get 5 most common languages
+    counts = {}
+    for index, row in fb_frame.iterrows():
+        lang = row["Language"]
+        if lang in counts:
+            counts[lang] += 1
+        else:
+            counts[lang] = 1
+    
+    most_common_langs = sorted(counts.items(), key= lambda x:x[1], reverse=True)
+    top_5 = set([lang[0] for lang in most_common_langs[:5]])
+
+    
+    fb_frame = fb_frame[fb_frame["Language"].isin(top_5)]
+    sns.set(style="whitegrid")
+    
+    
+    fig, ax = plt.subplots()
+    ax.set_yscale("log") # log first
+    swarm = sns.swarmplot(x = "Language", y="Facebook Follower #", data=fb_frame)
+    
+    st.pyplot(fig)
 
 
-def make_twitter_follower_hist(df:pd.DataFrame):
-    pass
+def make_facebook_follower_bar(df:pd.DataFrame):
+    fb_frame = df.dropna(subset=["Facebook page"])
+    fb_frame = fb_frame[["Facebook Follower #", "Region of Focus"]]
 
+    #display 5 regins with most followers
+    regions = {}
+    for index, row in fb_frame.iterrows():
+        region = row["Region of Focus"]
+        followers = row["Facebook Follower #"]
+        if region in regions:
+            regions[region] += followers
+        else:
+            regions[region] = followers
+    
+    most_followed_regions = sorted(regions.items(), key= lambda x:x[1], reverse=True)
+    top_5 = [region for region in most_followed_regions[:5]]
+    df = pd.DataFrame(top_5, columns = ["Region", "Followers"])
+    #st.dataframe(df)
+    st.bar_chart(x="Region",y="Followers",data=df)
 
-
-
-def make_facebook_follower_density(df:pd.DataFrame):
-    pass
+    
+    
 
 
 def make_youtube_subscriber_bubble(df:pd.DataFrame):
@@ -174,11 +216,12 @@ def main():
         st.write(overview_invest)
         fig1 = make_social_ven_diagram(df)
         st.pyplot(fig1)
+        st.caption("Ven Diagram of account ownership")
     with twitter:
         st.header("Twitter Analysis")
         st.write("Follower Network:")
-        fig = make_twitter_network(graph)
-        st.pyplot(fig)
+        #fig = make_twitter_network(graph)
+        #st.pyplot(fig)
         st.caption(graph_caption)
         st.write("Network Analysis:")
         col1, col2 = st.columns(2)
@@ -198,7 +241,15 @@ def main():
 
     with facebook:
         st.header("Facebook Analysis")
+        
+        st.write("Grouped Follower Swarm: ")
+        make_facebook_follower_swarm(df)
+
+        st.write("Total Followers by Region: ")
+        make_facebook_follower_bar(df)
     with youtube:
         st.header("Youtube Analysis")
+        #channel_views_df = get_all_channels_views(df)
+        #st.dataframe(channel_views_df)
 
 main()
