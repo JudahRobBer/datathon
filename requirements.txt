@@ -8,3 +8,4 @@ selenium >= 4.15.2
 beautifulsoup4==4.12.2
 google-api-python-client==2.108.0
 undetected-chromedriver==3.5.4
+openpyxl == 3.0.10
