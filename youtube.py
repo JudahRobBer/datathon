@@ -7,7 +7,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-API_KEY = ""
+API_KEY = "AIzaSyBe82AdDqRnFR-L5WMO9HbVZ02l1iXOJI4"
 
 youtube = build(
         serviceName='youtube',
@@ -98,19 +98,26 @@ def get_valid_ids(df:pd.DataFrame, username_map:dict = None) -> list:
                     username_map[id] = youtube_account
                 found_names.add(youtube_account)
             valid_ids.append(id)
+
     
     for name in account_names:
         id = get_channel_id(name)
+        if id is None:
+            id = get_channel_id("@" + name)
+            print("needed to @")
         if id and id not in valid_ids and name not in found_names:
             valid_ids.append(name)
             if username_map is not None:
-                row = df.loc[df['YouTube URL'] == account]
+                row = df.loc[df['YouTube URL'] == name]
                 youtube_account = row["YouTube account"]
                 youtube_account = str(youtube_account).split(" ")[4]
                 youtube_account = youtube_account[:youtube_account.find("\n")]
                 if youtube_account not in found_names:
                     username_map[id] = youtube_account
                 found_names.add(youtube_account)
+
+
+
     return valid_ids
 
 
@@ -130,10 +137,12 @@ def get_all_views_by_entity():
     for id in valid_ids:
         try:
             views = get_channel_views(id)
+            
             row = df.loc[df['YouTube account'] == user_id_map[id]]
             parent_entity = str(row["Parent entity (English)"]).strip().split()
             end = parent_entity.index("Name:")
             parent_entity = " ".join(parent_entity[1:end])
+            
             copy = ""
             for char in parent_entity:
                 if char.isnumeric():
@@ -155,7 +164,7 @@ def get_all_views_by_entity():
         tuple_list.append((key,value))
     
     df = pd.DataFrame(tuple_list, columns=["Parent Entity", "Total Views"])
-    df.to_csv("parent_youtubeviews.csv")
+    df.to_csv("parent_youtube_views.csv")
 
 def get_all_topics():
     """
@@ -165,7 +174,6 @@ def get_all_topics():
     df = pd.read_excel("CANIS_data.xlsx")
     df = df.dropna(subset=["YouTube account"])
     valid_ids = get_valid_ids(df)
-    print(len(valid_ids))
 
     
     topic_counts = {}
@@ -173,8 +181,7 @@ def get_all_topics():
     for id in valid_ids:
         try:
             topics = get_channel_topicDetails(id)
-            print(topics)
-            print()
+            
             if topics:
                 for topic in topics:
                     topic = topic[topic.rfind("/") + 1:]
@@ -188,12 +195,12 @@ def get_all_topics():
     tuple_list = []
     for key, value in topic_counts.items():
         tuple_list.append((key,value))
-    print(tuple_list)
+    
     
     df = pd.DataFrame(tuple_list, columns=["Topic", "Frequency"])
-    print(df)
     df.to_csv("topic_frequency.csv")
     
+
     
 
 
