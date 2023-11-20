@@ -1,9 +1,6 @@
 from googleapiclient.discovery import build
 import pandas as pd
 import numpy as np
-import os.path
-from pprint import pprint
-import networkx as nx
 import matplotlib.pyplot as plt
 
 
