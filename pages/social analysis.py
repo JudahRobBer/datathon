@@ -102,7 +102,7 @@ def make_twitter_network(graph:nx.DiGraph):
    
     graph_caption = """
     Directed Graph displaying follower relationship within the state agent dataset.
-    Accounts with less than 1500 followers were excluded from following analysis.
+    Accounts with less than 15000 followers were excluded from following analysis.
     Nodes are color coded by Entity Owner, and sized twitter follower count
     """
 
