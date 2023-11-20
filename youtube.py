@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-API_KEY = "AIzaSyBe82AdDqRnFR-L5WMO9HbVZ02l1iXOJI4"
+API_KEY = ""
 
 youtube = build(
         serviceName='youtube',
