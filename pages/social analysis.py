@@ -59,7 +59,6 @@ def make_twitter_network(graph:nx.DiGraph):
                 if cur > max_weight:
                     max_weight = cur
             except:
-                print("failed")
                 graph.remove_node(node)
                 pass
         
@@ -80,7 +79,6 @@ def make_twitter_network(graph:nx.DiGraph):
             
             try:
                 entity = attr["attr"]["entity"]
-                print(entity)
                 if entity not in color_map:
                     color = rd.choice(hex_colors)
                     color_map[entity] = color
@@ -131,8 +129,7 @@ def make_twitter_network(graph:nx.DiGraph):
     st.write("Junction Tree: ")
     
     fig, ax = plt.subplots()
-    pos = nx.nx_agraph.graphviz_layout(junction)
-    nx.draw(junction,node_size = 25, pos=pos)
+    nx.draw(junction,node_size = 25)
     st.pyplot(fig)
     st.caption(junction_caption)
     st.caption(junction_function)
